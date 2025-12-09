@@ -24,9 +24,16 @@ class ManagerDashboard(ctk.CTkFrame):
         
         ctk.CTkLabel(sidebar, text="QUẢN LÝ", font=("Roboto Medium", 22), text_color=COLOR_TEXT_SIDEBAR).pack(pady=(40, 50))
         
-        # Nút menu bên trái
-        ctk.CTkButton(sidebar, text="🏠 Tổng quan", font=("Roboto Medium", 14), fg_color="transparent", anchor="w", 
-                      command=self.render_home).pack(fill="x", padx=20, pady=10)
+        # Hàm tạo nút sidebar
+        def create_sidebar_btn(text, cmd, icon="🔹"):
+            btn = ctk.CTkButton(sidebar, text=f"{icon}  {text}", font=("Roboto Medium", 14), 
+                                fg_color="transparent", text_color="#bdc3c7", hover_color="#34495e", 
+                                anchor="w", height=45, command=cmd)
+            btn.pack(fill="x", padx=15, pady=5)
+
+        # Danh sách menu
+        create_sidebar_btn("Tổng quan", self.render_home, "🏠")
+        create_sidebar_btn("Tài khoản", self.render_account, "⚙️") # <--- NÚT MỚI THÊM
 
         ctk.CTkButton(sidebar, text="🚪 Đăng xuất", fg_color=COLOR_DANGER, height=40, 
                       command=self.confirm_logout).pack(side="bottom", pady=30, padx=20, fill="x")
@@ -43,6 +50,10 @@ class ManagerDashboard(ctk.CTkFrame):
     @property
     def current_manager_name(self):
         return self.controller.user_data.get('name', 'Admin')
+    
+    @property
+    def current_manager_id(self):
+        return self.controller.user_data.get('username', 'admin')
 
     # =========================================================================
     # HÀM HỖ TRỢ CHUNG
@@ -107,6 +118,89 @@ class ManagerDashboard(ctk.CTkFrame):
                 command=btn["cmd"]
             )
             card.grid(row=i//3, column=i%3, padx=15, pady=15, sticky="nsew")
+
+    # =========================================================================
+    # TRANG TÀI KHOẢN (MỚI THÊM)
+    # =========================================================================
+    def render_account(self):
+        self.clear_content()
+        
+        # Header
+        ctk.CTkButton(self.content_frame, text="← Quay lại", width=100, fg_color="transparent", 
+                      text_color=COLOR_TEXT_MAIN, hover_color="#dfe6e9", border_width=1,
+                      command=self.render_home).pack(anchor="w", padx=30, pady=(30, 10))
+        
+        ctk.CTkLabel(self.content_frame, text="CÀI ĐẶT TÀI KHOẢN QUẢN LÝ", font=("Roboto Medium", 26), text_color=COLOR_TEXT_MAIN).pack(anchor="w", padx=30, pady=(0, 20))
+        
+        # Menu cài đặt
+        menu_frame = ctk.CTkFrame(self.content_frame, fg_color="white", corner_radius=15)
+        menu_frame.pack(fill="both", expand=True, padx=50, pady=10)
+        
+        def create_setting_item(text, cmd):
+            btn = ctk.CTkButton(menu_frame, text=text, font=("Arial", 16), height=60, anchor="w",
+                                fg_color="transparent", text_color="#2c3e50", hover_color="#f1f2f6",
+                                command=cmd)
+            btn.pack(fill="x", padx=20, pady=5)
+            ctk.CTkFrame(menu_frame, height=1, fg_color="#ecf0f1").pack(fill="x", padx=20)
+
+        create_setting_item("📖  Hướng dẫn sử dụng dành cho Quản lý", self.open_guide)
+        create_setting_item("🔒  Đổi mật khẩu đăng nhập", self.open_change_password)
+
+    def open_guide(self):
+        if self.check_window_exists("guide"): return
+        window = ctk.CTkToplevel(self)
+        window.title("Hướng dẫn Quản lý")
+        self.center_window(window, 700, 600)
+        window.attributes("-topmost", True); window.configure(fg_color="white")
+        
+        ctk.CTkLabel(window, text="HƯỚNG DẪN QUẢN TRỊ VIÊN", font=("Roboto Medium", 20), text_color=COLOR_SIDEBAR).pack(pady=20)
+        textbox = ctk.CTkTextbox(window, font=("Arial", 14), wrap="word", fg_color="#f8f9fa", text_color="#333", border_width=0)
+        textbox.pack(fill="both", expand=True, padx=30, pady=10)
+        
+        content = """
+1. Hồ sơ Sinh viên/Giảng viên:
+   - Xem danh sách, thêm mới hoặc xóa tài khoản khỏi hệ thống.
+   
+2. Hệ thống phiếu:
+   - Tạo đợt đánh giá mới (VD: Học kỳ 1).
+   - ĐÓNG/MỞ phiếu: Quyết định thời gian sinh viên được phép nộp bài.
+
+3. Chỉnh sửa phiếu:
+   - Cấu hình các tiêu chí chấm điểm (Thêm dòng, sửa điểm).
+   - Những thay đổi này sẽ áp dụng cho tất cả sinh viên.
+
+4. Thống kê & Thông báo:
+   - Xem tổng quan số liệu toàn khoa.
+   - Gửi thông báo đến toàn thể sinh viên hoặc giảng viên.
+        """
+        textbox.insert("0.0", content); textbox.configure(state="disabled")
+        ctk.CTkButton(window, text="Đóng", fg_color=COLOR_SIDEBAR, width=100, command=window.withdraw).pack(pady=10)
+
+    def open_change_password(self):
+        if self.check_window_exists("change_pass"): return
+        window = ctk.CTkToplevel(self)
+        window.title("Đổi mật khẩu")
+        self.center_window(window, 450, 450)
+        window.attributes("-topmost", True); window.configure(fg_color="white")
+        
+        ctk.CTkLabel(window, text="ĐỔI MẬT KHẨU QUẢN LÝ", font=("Roboto Medium", 20), text_color=COLOR_SIDEBAR).pack(pady=30)
+        entry_conf = {"width": 320, "height": 45, "fg_color": "#f1f2f6", "text_color": "#333", "border_width": 0, "corner_radius": 8}
+        
+        e_old = ctk.CTkEntry(window, placeholder_text="Mật khẩu cũ", show="*", **entry_conf); e_old.pack(pady=10)
+        e_new = ctk.CTkEntry(window, placeholder_text="Mật khẩu mới", show="*", **entry_conf); e_new.pack(pady=10)
+        e_cfm = ctk.CTkEntry(window, placeholder_text="Nhập lại mật khẩu mới", show="*", **entry_conf); e_cfm.pack(pady=10)
+
+        def save():
+            old, new, cfm = e_old.get(), e_new.get(), e_cfm.get()
+            if not old or not new: messagebox.showwarning("Lỗi", "Nhập đủ thông tin!", parent=window); return
+            if new != cfm: messagebox.showerror("Lỗi", "Mật khẩu mới không khớp!", parent=window); return
+            
+            # Gọi DB đổi pass
+            if self.db.change_password(self.current_manager_id, old, new):
+                messagebox.showinfo("Thành công", "Đổi mật khẩu thành công!", parent=window); window.destroy()
+            else: messagebox.showerror("Lỗi", "Mật khẩu cũ sai!", parent=window)
+
+        ctk.CTkButton(window, text="LƯU THAY ĐỔI", fg_color=COLOR_ACCENT, height=45, width=320, command=save).pack(pady=30)
 
     # =========================================================================
     # 1 & 2. QUẢN LÝ USER (SV & GV)
