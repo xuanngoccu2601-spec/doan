@@ -6,14 +6,13 @@ import shutil
 from data.db_handler import DBHandler
 
 # --- BẢNG MÀU MODERN UI ---
-COLOR_SIDEBAR = "#2c3e50"       # Xanh đen (Sidebar)
-COLOR_BG_MAIN = "#ecf0f1"       # Xám nhạt (Nền chính)
-COLOR_CARD_BG = "#ffffff"       # Trắng (Nền thẻ)
-COLOR_ACCENT = "#1abc9c"        # Xanh ngọc (Nút chính)
-COLOR_HOVER = "#16a085"         # Xanh ngọc đậm (Hover)
-COLOR_TEXT_MAIN = "#2c3e50"     # Màu chữ chính
-COLOR_TEXT_SIDEBAR = "#ecf0f1"  # Màu chữ sidebar
-COLOR_DANGER = "#e74c3c"        # Đỏ
+COLOR_SIDEBAR = "#2c3e50"       
+COLOR_BG_MAIN = "#ecf0f1"       
+COLOR_TEXT_MAIN = "#2c3e50"     
+COLOR_TEXT_SIDEBAR = "#ecf0f1"  
+COLOR_DANGER = "#c0392b"
+COLOR_ACCENT = "#1abc9c"
+COLOR_HOVER = "#16a085"
 
 class StudentDashboard(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -22,9 +21,7 @@ class StudentDashboard(ctk.CTkFrame):
         self.db = DBHandler()
         self.windows = {} 
 
-        # =========================================================================
         # 1. SIDEBAR
-        # =========================================================================
         sidebar = ctk.CTkFrame(self, width=240, corner_radius=0, fg_color=COLOR_SIDEBAR)
         sidebar.pack(side="left", fill="y")
         
@@ -40,13 +37,11 @@ class StudentDashboard(ctk.CTkFrame):
         create_sidebar_btn("Hồ sơ cá nhân", self.show_profile_page, "👤")
         create_sidebar_btn("Tài khoản", self.show_account_page, "⚙️")
 
-        ctk.CTkButton(sidebar, text="🚪 Đăng xuất", fg_color=COLOR_DANGER, hover_color="#c0392b", 
+        ctk.CTkButton(sidebar, text="🚪 Đăng xuất", fg_color=COLOR_DANGER, hover_color="#e74c3c", 
                       height=40, font=("Roboto Medium", 14),
                       command=self.confirm_logout).pack(side="bottom", pady=30, padx=20, fill="x")
 
-        # =========================================================================
         # 2. MAIN CONTENT
-        # =========================================================================
         self.right_panel = ctk.CTkFrame(self, fg_color=COLOR_BG_MAIN)
         self.right_panel.pack(side="right", fill="both", expand=True)
 
@@ -81,9 +76,7 @@ class StudentDashboard(ctk.CTkFrame):
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("Treeview.Heading", font=("Roboto Medium", 13), background="#ecf0f1", foreground=COLOR_TEXT_MAIN, relief="flat")
-        style.map("Treeview.Heading", background=[('active', '#bdc3c7')])
         style.configure("Treeview", font=("Arial", 12), rowheight=35, background="white", fieldbackground="white", foreground="#2c3e50", borderwidth=0)
-        style.map("Treeview", background=[('selected', COLOR_ACCENT)], foreground=[('selected', 'white')])
 
     # =========================================================================
     # LOGIC CHUYỂN TRANG
@@ -123,7 +116,7 @@ class StudentDashboard(ctk.CTkFrame):
         grid.pack(fill="both", expand=True)
         grid.columnconfigure((0, 1, 2), weight=1)
 
-        buttons_config = [
+        buttons = [
             {"text": "Xem điểm\nRèn luyện", "icon": "📊", "cmd": self.open_view_scores, "color": "#3498db"},
             {"text": "Đợt đánh giá", "icon": "📅", "cmd": self.open_periods, "color": "#9b59b6"},
             {"text": "Thống kê lớp", "icon": "📈", "cmd": self.open_class_statistics, "color": "#e67e22"},
@@ -132,7 +125,7 @@ class StudentDashboard(ctk.CTkFrame):
             {"text": "Thông báo", "icon": "🔔", "cmd": self.open_notifications, "color": "#e74c3c"}
         ]
         
-        for i, btn in enumerate(buttons_config):
+        for i, btn in enumerate(buttons):
             card = ctk.CTkButton(
                 grid, 
                 text=f"{btn['icon']}\n\n{btn['text']}", 
@@ -145,7 +138,7 @@ class StudentDashboard(ctk.CTkFrame):
             card.grid(row=i//3, column=i%3, padx=15, pady=15, sticky="nsew")
 
     # =========================================================================
-    # TRANG CON (PROFILE & ACCOUNT)
+    # TRANG CON
     # =========================================================================
     def setup_profile_page(self):
         ctk.CTkButton(self.page_profile, text="← Quay lại", width=100, fg_color="transparent", 
@@ -248,13 +241,13 @@ class StudentDashboard(ctk.CTkFrame):
         self.setup_treeview_style()
         cols = ("Học kỳ", "Năm học", "Điểm số", "Xếp loại")
         tree = ttk.Treeview(window, columns=cols, show="headings")
-        for c in cols: tree.heading(c, text=c); tree.column(c, anchor="center")
+        for c in cols: tree.heading(c, text=c); tree.column(c, anchor="center", width=150)
         tree.pack(fill="both", expand=True, padx=30, pady=(0, 30))
         
         data = self.db.get_student_scores(self.current_user_id)
         for row in data: tree.insert("", "end", values=row)
 
-    # 2. XEM ĐỢT
+    # 2. XEM ĐỢT (ĐÃ SỬA LỖI HIỂN THỊ)
     def open_periods(self):
         if self.check_window_exists("periods"): return
         window = ctk.CTkToplevel(self)
@@ -264,14 +257,15 @@ class StudentDashboard(ctk.CTkFrame):
         
         ctk.CTkLabel(window, text="CÁC ĐỢT ĐÁNH GIÁ", font=("Roboto Medium", 20), text_color=COLOR_SIDEBAR).pack(pady=20)
         self.setup_treeview_style()
-        cols = ("STT", "Tên đợt", "Bắt đầu", "Kết thúc", "Trạng thái")
+        cols = ("ID", "Tên đợt", "Bắt đầu", "Kết thúc", "Trạng thái")
         tree = ttk.Treeview(window, columns=cols, show="headings")
-        tree.column("STT", width=50, anchor="center"); tree.column("Tên đợt", width=300)
+        tree.column("ID", width=50, anchor="center"); tree.column("Tên đợt", width=300)
         for c in cols: tree.heading(c, text=c)
         tree.pack(fill="both", expand=True, padx=30, pady=(0, 30))
         
+        # --- SỬA Ở ĐÂY: insert thẳng row vì row đã chuẩn từ DB ---
         data = self.db.get_periods()
-        for row in data: tree.insert("", "end", values=(row[0], row[1], row[3], row[4], row[5]))
+        for row in data: tree.insert("", "end", values=row)
 
     # 3. THỐNG KÊ LỚP
     def open_class_statistics(self):
@@ -317,7 +311,7 @@ class StudentDashboard(ctk.CTkFrame):
         data = self.db.get_student_history(self.current_user_id)
         for row in data: tree.insert("", "end", values=row)
 
-    # 5. CHẤM ĐIỂM (CẬP NHẬT LOGIC DYNAMIC)
+    # 5. CHẤM ĐIỂM (ĐÃ SỬA LỖI GIAO DIỆN)
     def open_grading(self):
         if self.check_window_exists("grading"): return
         window = ctk.CTkToplevel(self)
@@ -328,7 +322,6 @@ class StudentDashboard(ctk.CTkFrame):
         if not hasattr(self, 'selected_files'): self.selected_files = []
         self.auto_form_code = f"MP{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-        # Header
         header = ctk.CTkFrame(window, height=60, fg_color="white", corner_radius=0)
         header.pack(fill="x")
         ctk.CTkLabel(header, text="PHIẾU ĐÁNH GIÁ RÈN LUYỆN", font=("Roboto Medium", 22), text_color=COLOR_SIDEBAR).place(relx=0.5, rely=0.5, anchor="center")
@@ -336,7 +329,6 @@ class StudentDashboard(ctk.CTkFrame):
         content_frame = ctk.CTkFrame(window, fg_color="transparent")
         content_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # TRÁI: Checkbox
         left_frame = ctk.CTkFrame(content_frame, fg_color="white", corner_radius=10)
         left_frame.place(relx=0, rely=0, relwidth=0.68, relheight=1)
         ctk.CTkLabel(left_frame, text="DANH SÁCH TIÊU CHÍ ĐÁNH GIÁ", font=("Roboto Medium", 16), text_color=COLOR_ACCENT).pack(anchor="w", padx=20, pady=(15, 5))
@@ -344,9 +336,7 @@ class StudentDashboard(ctk.CTkFrame):
         scroll_frame = ctk.CTkScrollableFrame(left_frame, fg_color="transparent")
         scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # LẤY DỮ LIỆU TỪ DB (DYNAMIC)
         data_sheet = self.db.get_grading_criteria() 
-        
         self.check_vars = [] 
         for title, items in data_sheet:
             ctk.CTkLabel(scroll_frame, text=title, font=("Arial", 15, "bold"), text_color=COLOR_SIDEBAR, anchor="w").pack(fill="x", pady=(10, 5))
@@ -358,12 +348,10 @@ class StudentDashboard(ctk.CTkFrame):
                 self.check_vars.append((var, score, content)) 
             ctk.CTkFrame(scroll_frame, height=1, fg_color="#eee").pack(fill="x", pady=5)
 
-        # PHẢI: Thông tin & File
         right_frame = ctk.CTkFrame(content_frame, fg_color="white", corner_radius=10)
         right_frame.place(relx=0.7, rely=0, relwidth=0.3, relheight=1)
         
         ctk.CTkLabel(right_frame, text="THÔNG TIN BỔ SUNG", font=("Roboto Medium", 16), text_color=COLOR_ACCENT).pack(pady=(15, 10))
-        
         ctk.CTkLabel(right_frame, text="Mã phiếu (Tự động):", font=("Arial", 13), text_color="gray").pack(anchor="w", padx=15)
         ctk.CTkLabel(right_frame, text=self.auto_form_code, font=("Arial", 16, "bold"), text_color=COLOR_DANGER).pack(anchor="w", padx=15, pady=(0, 15))
 
@@ -388,7 +376,6 @@ class StudentDashboard(ctk.CTkFrame):
         self.txt_file_list.pack(fill="x", padx=15, pady=10)
         self.txt_file_list.insert("0.0", "Chưa có file nào..."); self.txt_file_list.configure(state="disabled")
 
-        # Footer Bar
         bottom_bar = ctk.CTkFrame(window, height=70, fg_color="white")
         bottom_bar.pack(fill="x", side="bottom")
         
@@ -447,7 +434,7 @@ class StudentDashboard(ctk.CTkFrame):
                 self.deselect_all()
                 self.auto_form_code = f"MP{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
             else:
-                 messagebox.showerror("Lỗi", "Không thể nộp phiếu. Vui lòng thử lại!", parent=window)
+                 messagebox.showerror("Lỗi", "Không thể nộp phiếu (Có thể chưa có đợt nào MỞ hoặc lỗi kết nối)!", parent=window)
 
     # 6. THÔNG BÁO (MODERN STYLE)
     def open_notifications(self):

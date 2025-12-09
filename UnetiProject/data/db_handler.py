@@ -141,13 +141,14 @@ class DBHandler:
         return result
 
     def submit_form(self, student_id, score, evidence_files, evidence_name, selected_criteria, form_id=None):
-        # 1. Tìm đợt đang mở (Logic: Trạng thái 'Hoạt động')
+        # 1. Tìm đợt đang mở (CHỈ CẦN TRẠNG THÁI HOẠT ĐỘNG, BỎ QUA NGÀY THÁNG)
         query_dot = """
             SELECT TOP 1 id FROM DotDanhGia 
             WHERE trang_thai = N'Hoạt động'
-            AND GETDATE() BETWEEN ngay_bat_dau_sv AND ngay_ket_thuc_sv
+            ORDER BY id DESC
         """
         dot = self._execute_query(query_dot, fetch_one=True)
+        
         if not dot:
             print("Không tìm thấy đợt đánh giá nào đang mở!")
             return False
@@ -321,7 +322,15 @@ class DBHandler:
             for i, row in enumerate(data):
                 bd = row['ngay_bat_dau_sv'].strftime('%d/%m/%Y') if row['ngay_bat_dau_sv'] else "..."
                 kt = row['ngay_ket_thuc_sv'].strftime('%d/%m/%Y') if row['ngay_ket_thuc_sv'] else "..."
-                result.append((i + 1, row['ten_dot'], bd, bd, kt, row['trang_thai']))
+                
+                # Trả về 5 giá trị chuẩn để View dùng
+                result.append((
+                    row['id'],          # 0. ID thật
+                    row['ten_dot'],     # 1. Tên
+                    bd,                 # 2. Bắt đầu
+                    kt,                 # 3. Kết thúc
+                    row['trang_thai']   # 4. Trạng thái
+                ))
         return result
 
     # =========================================================================
@@ -383,6 +392,18 @@ class DBHandler:
             return self._execute_query(query, (name, start_date, end_date), commit=True)
         except: return False
 
+    def delete_period(self, period_id):
+        """Xóa đợt đánh giá và toàn bộ phiếu liên quan"""
+        try:
+            # 1. Xóa phiếu rèn luyện trước
+            self._execute_query("DELETE FROM PhieuRenLuyen WHERE ma_dot = ?", (period_id,), commit=True)
+            # 2. Xóa đợt
+            query = "DELETE FROM DotDanhGia WHERE id = ?"
+            return self._execute_query(query, (period_id,), commit=True)
+        except Exception as e:
+            print(f"Lỗi xóa đợt: {e}")
+            return False
+
     def set_period_status(self, period_id, status):
         try:
             query = "UPDATE DotDanhGia SET trang_thai = ? WHERE id = ?"
@@ -428,11 +449,9 @@ class DBHandler:
             return {"sv": 0, "gv": 0, "phieu": 0, "duyet": 0}
 
     # =========================================================================
-    # 6. QUẢN LÝ TIÊU CHÍ (DYNAMIC) - TỰ ĐỘNG LẤY GỐC NẾU TRỐNG
+    # 6. QUẢN LÝ TIÊU CHÍ (DYNAMIC)
     # =========================================================================
-    
     def init_criteria_table(self):
-        """Tự động tạo bảng và thêm dữ liệu GỐC CŨ nếu chưa có"""
         try:
             sql_create = """
                 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[TieuChiMau]') AND type in (N'U'))
@@ -478,7 +497,6 @@ class DBHandler:
             print(f"Lỗi init tiêu chí: {e}")
 
     def get_grading_criteria(self):
-        """Lấy danh sách tiêu chí"""
         self.init_criteria_table() 
         query = "SELECT nhom_tieu_chi, noi_dung, diem_toi_da FROM TieuChiMau ORDER BY id"
         data = self._execute_query(query)
@@ -494,7 +512,6 @@ class DBHandler:
         return [(nhom, grouped[nhom]) for nhom in order]
 
     def update_grading_criteria(self, new_data_list):
-        """Lưu bộ tiêu chí mới"""
         try:
             self._execute_query("DELETE FROM TieuChiMau", commit=True)
             insert_query = "INSERT INTO TieuChiMau (nhom_tieu_chi, noi_dung, diem_toi_da) VALUES (?, ?, ?)"
@@ -508,8 +525,51 @@ class DBHandler:
             print(f"Lỗi cập nhật tiêu chí: {e}")
             self.conn.rollback()
             return False
+            
+    # HÀM CHO ADMIN SỬA PHIẾU
+    def get_all_forms_admin(self):
+        query = """
+            SELECT p.id, p.masv, sv.ten, p.diem_tong, p.trang_thai, d.ten_dot, p.chi_tiet_tieu_chi
+            FROM PhieuRenLuyen p
+            JOIN SinhVien sv ON p.masv = sv.masv
+            JOIN DotDanhGia d ON p.ma_dot = d.id
+            ORDER BY p.ngay_nop DESC
+        """
+        data = self._execute_query(query)
+        result = []
+        if data:
+            for row in data:
+                criteria_list = []
+                if row['chi_tiet_tieu_chi']:
+                    try: criteria_list = json.loads(row['chi_tiet_tieu_chi'])
+                    except: criteria_list = []
 
-# --- HÀM HỖ TRỢ BÊN NGOÀI CLASS ---
+                result.append((
+                    f"PH{row['id']:03d}", 
+                    row['masv'],
+                    row['ten'],
+                    str(row['diem_tong']),
+                    row['trang_thai'],
+                    row['ten_dot'],
+                    row['id'],
+                    criteria_list
+                ))
+        return result
+
+    def update_form_detailed(self, form_id, new_status, new_total_score, new_criteria_list):
+        try:
+            json_criteria = json.dumps(new_criteria_list, ensure_ascii=False)
+            query = """
+                UPDATE PhieuRenLuyen 
+                SET trang_thai = ?, diem_tong = ?, chi_tiet_tieu_chi = ?
+                WHERE id = ?
+            """
+            return self._execute_query(query, (new_status, new_total_score, json_criteria, form_id), commit=True)
+        except Exception as e:
+            print(f"Lỗi update phiếu: {e}")
+            return False
+
+# --- HÀM HỖ TRỢ ---
 def validate_login(username, password):
     db = DBHandler()
     res = db.check_login(username, password)

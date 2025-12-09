@@ -258,54 +258,100 @@ class ManagerDashboard(ctk.CTkFrame):
     # =========================================================================
     # 3. HỆ THỐNG PHIẾU (ĐÓNG/MỞ ĐỢT)
     # =========================================================================
+    # =========================================================================
+    # 3. HỆ THỐNG PHIẾU (QUẢN LÝ ĐỢT: THÊM / SỬA / XÓA / ĐÓNG / MỞ)
+    # =========================================================================
     def open_manage_periods(self):
         if self.check_window_exists("m_period"): return
         window = ctk.CTkToplevel(self)
         window.title("Hệ thống quản lý phiếu")
-        self.center_window(window, 900, 600)
+        self.center_window(window, 1000, 600)
         window.attributes("-topmost", True); window.configure(fg_color="white")
         self.windows["m_period"] = window
 
         ctk.CTkLabel(window, text="QUẢN LÝ HỆ THỐNG PHIẾU ĐÁNH GIÁ", font=("Roboto Medium", 20), text_color=COLOR_SIDEBAR).pack(pady=15)
         
+        # Bảng danh sách
         self.setup_treeview_style()
         cols = ("ID", "Tên đợt", "Bắt đầu", "Kết thúc", "Trạng thái")
         tree = ttk.Treeview(window, columns=cols, show="headings")
         tree.column("ID", width=50, anchor="center"); tree.column("Tên đợt", width=250)
+        tree.column("Trạng thái", width=120, anchor="center")
         for c in cols: tree.heading(c, text=c)
         tree.pack(fill="both", expand=True, padx=30, pady=10)
 
+        # Hàm làm mới dữ liệu bảng
         def refresh():
+            # Xóa hết dữ liệu cũ trên bảng
             for i in tree.get_children(): tree.delete(i)
+            # Lấy dữ liệu mới từ DB
             data = self.db.get_periods()
-            for r in data: tree.insert("", "end", values=(r[0], r[1], r[2], r[4], r[5]))
+            for r in data: 
+                # r = (id, ten, bd, kt, trangthai)
+                tree.insert("", "end", values=r)
+        
+        # Gọi refresh lần đầu để hiện dữ liệu
         refresh()
 
+        # --- KHUNG CHỨC NĂNG ĐIỀU KHIỂN ---
         action_frame = ctk.CTkFrame(window, fg_color="#ecf0f1", corner_radius=10)
         action_frame.pack(fill="x", padx=30, pady=10)
-        ctk.CTkLabel(action_frame, text="Điều khiển trạng thái:", font=("Arial", 13, "bold"), text_color="#333").pack(side="left", padx=15, pady=10)
+        
+        ctk.CTkLabel(action_frame, text="Thao tác:", font=("Arial", 13, "bold"), text_color="#333").pack(side="left", padx=15, pady=10)
 
+        # Logic Đổi trạng thái
         def change_status(status_text):
             sel = tree.selection()
-            if not sel: messagebox.showwarning("Lỗi", "Chọn đợt cần đổi!", parent=window); return
+            if not sel: messagebox.showwarning("Lỗi", "Vui lòng chọn một đợt!", parent=window); return
             period_id = tree.item(sel[0])['values'][0]
-            if messagebox.askyesno("Xác nhận", f"Bạn muốn chuyển thành: {status_text}?", parent=window):
-                if self.db.set_period_status(period_id, status_text): refresh(); messagebox.showinfo("OK", "Đã cập nhật!")
-                else: messagebox.showerror("Lỗi", "Lỗi DB!")
+            
+            if self.db.set_period_status(period_id, status_text):
+                refresh() # <--- Cập nhật lại bảng ngay lập tức
+                messagebox.showinfo("Thành công", f"Đã chuyển thành: {status_text}", parent=window)
+            else:
+                messagebox.showerror("Lỗi", "Lỗi DB!", parent=window)
 
-        ctk.CTkButton(action_frame, text="🔓 MỞ PHIẾU", fg_color=COLOR_SUCCESS, width=150, command=lambda: change_status("Hoạt động")).pack(side="left", padx=5)
-        ctk.CTkButton(action_frame, text="🔒 ĐÓNG PHIẾU", fg_color=COLOR_DANGER, width=150, command=lambda: change_status("Đã đóng")).pack(side="left", padx=5)
+        # Logic Xóa đợt
+        def delete_p():
+            sel = tree.selection()
+            if not sel: messagebox.showwarning("Lỗi", "Chọn đợt cần xóa!", parent=window); return
+            
+            period_id = tree.item(sel[0])['values'][0]
+            period_name = tree.item(sel[0])['values'][1]
 
+            if messagebox.askyesno("Xác nhận xóa", f"Bạn chắc chắn muốn xóa đợt '{period_name}'?\n(Cẩn thận: Không thể xóa nếu đã có sinh viên nộp bài)", parent=window):
+                if self.db.delete_period(period_id):
+                    refresh() # <--- Cập nhật lại bảng ngay sau khi xóa
+                    messagebox.showinfo("Thành công", "Đã xóa đợt đánh giá!", parent=window)
+                else:
+                    messagebox.showerror("Thất bại", "Không thể xóa đợt này (Có thể do đã có dữ liệu phiếu nộp liên quan).", parent=window)
+
+        # Các nút bấm
+        ctk.CTkButton(action_frame, text="🔓 MỞ PHIẾU", fg_color=COLOR_SUCCESS, width=120, command=lambda: change_status("Hoạt động")).pack(side="left", padx=5)
+        ctk.CTkButton(action_frame, text="🔒 ĐÓNG PHIẾU", fg_color="#f39c12", width=120, command=lambda: change_status("Đã đóng")).pack(side="left", padx=5)
+        ctk.CTkButton(action_frame, text="🗑 XÓA ĐỢT", fg_color=COLOR_DANGER, width=120, command=delete_p).pack(side="right", padx=15)
+
+        # --- KHUNG TẠO MỚI ---
         add_frame = ctk.CTkFrame(window, fg_color="white", border_width=1, border_color="#ccc")
         add_frame.pack(fill="x", padx=30, pady=10)
+        
+        ctk.CTkLabel(add_frame, text="Tạo mới:", text_color="gray").pack(side="left", padx=10)
         e1 = ctk.CTkEntry(add_frame, placeholder_text="Tên đợt (VD: HK2 2025)", width=200); e1.pack(side="left", padx=5, pady=10)
         e2 = ctk.CTkEntry(add_frame, placeholder_text="Bắt đầu (yyyy-mm-dd)", width=140); e2.pack(side="left", padx=5)
         e3 = ctk.CTkEntry(add_frame, placeholder_text="Kết thúc (yyyy-mm-dd)", width=140); e3.pack(side="left", padx=5)
         
         def add():
-            if self.db.create_period(e1.get(), e2.get(), e3.get()): messagebox.showinfo("Xong", "Đã tạo & MỞ!"); refresh()
-            else: messagebox.showerror("Lỗi", "Lỗi tạo đợt!")
-        ctk.CTkButton(add_frame, text="+ Tạo Mới", width=100, fg_color=COLOR_ACCENT, command=add).pack(side="right", padx=10)
+            if not e1.get() or not e2.get(): messagebox.showwarning("Thiếu", "Nhập đủ thông tin!", parent=window); return
+            
+            if self.db.create_period(e1.get(), e2.get(), e3.get()): 
+                refresh() # <--- QUAN TRỌNG: Cập nhật bảng ngay sau khi thêm
+                messagebox.showinfo("Xong", "Đã tạo đợt mới thành công!", parent=window)
+                # Xóa trắng ô nhập sau khi thêm
+                e1.delete(0, 'end'); e2.delete(0, 'end'); e3.delete(0, 'end')
+            else: 
+                messagebox.showerror("Lỗi", "Lỗi tạo đợt (Sai định dạng ngày hoặc lỗi DB)!", parent=window)
+        
+        ctk.CTkButton(add_frame, text="+ Thêm Ngay", width=100, fg_color=COLOR_ACCENT, command=add).pack(side="right", padx=10)
 
     # =========================================================================
     # 4. THỐNG KÊ KHOA
